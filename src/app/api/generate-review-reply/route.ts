@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { buildReviewReplyPrompt } from "@/lib/prompts";
 import { extractJSON } from "@/lib/parse-json";
+import { checkAndIncrementUsage } from "@/lib/usage-limit";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -19,6 +20,15 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+
+    // 利用回数チェック
+    const usageCheck = await checkAndIncrementUsage(supabase, user.id);
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        { error: usageCheck.error },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();

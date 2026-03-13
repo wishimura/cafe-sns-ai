@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,8 @@ import {
   LogOut,
   Menu,
   X,
+  Shield,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -24,13 +26,33 @@ const navItems = [
   { href: "/dashboard/review", label: "レビュー返信", icon: MessageSquare },
   { href: "/dashboard/history", label: "履歴", icon: Clock },
   { href: "/dashboard/shop", label: "店舗設定", icon: Store },
+  { href: "/dashboard/plan", label: "プラン", icon: CreditCard },
 ];
+
+const adminItem = { href: "/dashboard/admin", label: "管理者", icon: Shield };
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("shops")
+        .select("is_admin")
+        .eq("user_id", user.id)
+        .single();
+      setIsAdmin(!!data?.is_admin);
+    }
+    checkAdmin();
+  }, [supabase]);
+
+  const allNavItems = isAdmin ? [...navItems, adminItem] : navItems;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -47,7 +69,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
-        {navItems.map((item) => {
+        {allNavItems.map((item) => {
           const isActive =
             item.href === "/dashboard"
               ? pathname === "/dashboard"

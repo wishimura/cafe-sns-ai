@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Shop } from "@/types/database";
 import {
@@ -10,6 +10,8 @@ import {
   Sparkles,
   AlertCircle,
   ArrowRight,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PostResult from "@/components/PostResult";
@@ -21,23 +23,42 @@ interface GeneratedPost {
   hashtags: string;
 }
 
-export default function PostPage() {
+function PostPageContent() {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [shop, setShop] = useState<Shop | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GeneratedPost | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
     theme: "",
     menuItem: "",
     supplement: "",
     toneStyle: "friendly",
+    platform: "all",
     weatherNote: "",
     hasWeatherNote: false,
     includeTakeout: false,
     includeVisitGuide: false,
   });
+
+  // 再編集用：URLパラメータからフォームにプリフィル
+  const loadFromParams = useCallback(() => {
+    const theme = searchParams.get("theme");
+    const menuItem = searchParams.get("menuItem");
+    const supplement = searchParams.get("supplement");
+    if (theme || menuItem || supplement) {
+      setForm((prev) => ({
+        ...prev,
+        theme: theme || prev.theme,
+        menuItem: menuItem || prev.menuItem,
+        supplement: supplement || prev.supplement,
+      }));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     async function loadShop() {
@@ -56,7 +77,8 @@ export default function PostPage() {
       setLoading(false);
     }
     loadShop();
-  }, [supabase]);
+    loadFromParams();
+  }, [supabase, loadFromParams]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -69,6 +91,48 @@ export default function PostPage() {
       [name]:
         type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("画像は5MB以下にしてください");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  const uploadPhoto = async (): Promise<string | null> => {
+    if (!photoFile || !shop) return null;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const ext = photoFile.name.split(".").pop();
+    const path = `${user.id}/${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from("post-photos")
+      .upload(path, photoFile);
+
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("post-photos").getPublicUrl(path);
+
+    return publicUrl;
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -104,13 +168,19 @@ export default function PostPage() {
   const handleSave = async () => {
     if (!result || !shop) return;
 
+    let photoUrl: string | null = null;
+    if (photoFile) {
+      photoUrl = await uploadPhoto();
+    }
+
     try {
       const { error } = await supabase.from("post_generations").insert({
         shop_id: shop.id,
         theme: form.theme,
         menu_item: form.menuItem,
         supplement: form.supplement,
-        platform: "all",
+        platform: form.platform,
+        photo_url: photoUrl,
         output_1: result.instagram_posts[0]?.text || "",
         output_2: result.instagram_posts[1]?.text || "",
         output_3: result.instagram_posts[2]?.text || "",
@@ -207,10 +277,73 @@ export default function PostPage() {
               onChange={handleChange}
             />
           </div>
+
+          {/* 写真アップロード */}
+          <div>
+            <label className="label">写真</label>
+            {photoPreview ? (
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoPreview}
+                  alt="プレビュー"
+                  className="w-32 h-32 object-cover rounded-lg border"
+                />
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 transition-colors w-full">
+                <ImagePlus className="w-5 h-5 text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  写真を選択（5MB以下）
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoChange}
+                />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="card space-y-4">
           <h2 className="font-bold text-lg">オプション</h2>
+
+          {/* 投稿媒体選択 */}
+          <div>
+            <label className="label">投稿媒体</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { value: "all", label: "すべて" },
+                { value: "instagram", label: "Instagram" },
+                { value: "story", label: "ストーリー" },
+                { value: "line", label: "LINE" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    setForm((prev) => ({ ...prev, platform: opt.value }))
+                  }
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    form.platform === opt.value
+                      ? "bg-brand-600 text-white border-brand-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div>
             <label className="label">文体スタイル</label>
@@ -311,11 +444,28 @@ export default function PostPage() {
       {result && (
         <PostResult
           result={result}
+          platform={form.platform}
           onSave={handleSave}
-          onRegenerate={() => handleGenerate({ preventDefault: () => {} } as React.FormEvent)}
+          onRegenerate={() =>
+            handleGenerate({ preventDefault: () => {} } as React.FormEvent)
+          }
           generating={generating}
         />
       )}
     </div>
+  );
+}
+
+export default function PostPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
+        </div>
+      }
+    >
+      <PostPageContent />
+    </Suspense>
   );
 }

@@ -230,12 +230,12 @@ export default function ReviewPage() {
 
       {result && (
         <div className="mt-8 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-xl font-bold">返信案（3案）</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleGenerate({ preventDefault: () => {} } as React.FormEvent)}
-                className="btn-secondary flex items-center gap-2 text-sm"
+                className="btn-secondary flex items-center gap-2 text-sm flex-1 sm:flex-none justify-center"
                 disabled={generating}
               >
                 {generating ? (
@@ -247,7 +247,7 @@ export default function ReviewPage() {
               </button>
               <button
                 onClick={handleSave}
-                className="btn-primary flex items-center gap-2 text-sm"
+                className="btn-primary flex items-center gap-2 text-sm flex-1 sm:flex-none justify-center"
               >
                 <Save className="w-4 h-4" />
                 保存

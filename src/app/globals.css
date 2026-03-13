@@ -32,10 +32,18 @@
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6;
   }
 
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  .input-field,
+  .textarea-field {
+    font-size: 16px; /* Prevents zoom on iOS */
   }
 }

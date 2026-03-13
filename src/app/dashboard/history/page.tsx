@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { PostGeneration, ReviewReply } from "@/types/database";
 import {
@@ -14,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -22,6 +24,7 @@ type TabType = "posts" | "reviews";
 
 export default function HistoryPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [tab, setTab] = useState<TabType>("posts");
   const [posts, setPosts] = useState<PostGeneration[]>([]);
   const [reviews, setReviews] = useState<ReviewReply[]>([]);
@@ -327,7 +330,22 @@ export default function HistoryPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex items-center gap-2 pt-2 flex-wrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const params = new URLSearchParams({
+                            theme: post.theme || "",
+                            menuItem: post.menu_item || "",
+                            supplement: post.supplement || "",
+                          });
+                          router.push(`/dashboard/post?${params.toString()}`);
+                        }}
+                        className="text-sm flex items-center gap-1 px-3 py-1.5 rounded-lg text-brand-600 hover:bg-brand-50 transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        再編集
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
