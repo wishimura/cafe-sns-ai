@@ -27,12 +27,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
         });
         if (error) throw error;
-        toast.success("確認メールを送信しました。メールをご確認ください。");
+        toast.success("アカウントを作成しました");
+        router.push("/dashboard");
+        router.refresh();
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
