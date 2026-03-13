@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { buildPostGenerationPrompt } from "@/lib/prompts";
+import { extractJSON } from "@/lib/parse-json";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       throw new Error("AIからの応答がありませんでした");
     }
 
-    const result = JSON.parse(content.text);
+    const result = extractJSON(content.text);
 
     return NextResponse.json({ result });
   } catch (error: unknown) {
