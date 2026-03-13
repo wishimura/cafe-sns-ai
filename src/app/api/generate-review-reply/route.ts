@@ -1,10 +1,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { buildReviewReplyPrompt } from "@/lib/prompts";
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getAnthropic() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
 export const dynamic = "force-dynamic";
@@ -51,25 +51,23 @@ export async function POST(request: Request) {
       replyTone: replyTone || "neutral",
     });
 
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
+    const message = await getAnthropic().messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
       messages: [
         {
-          role: "system",
-          content: "あなたは小規模カフェのGoogleレビュー返信を専門とするプロです。指定されたJSON形式で出力してください。",
+          role: "user",
+          content: `あなたは小規模カフェのGoogleレビュー返信を専門とするプロです。指定されたJSON形式で出力してください。JSONのみを返し、他のテキストは含めないでください。\n\n${prompt}`,
         },
-        { role: "user", content: prompt },
       ],
-      temperature: 0.7,
-      response_format: { type: "json_object" },
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
+    const content = message.content[0];
+    if (content.type !== "text") {
       throw new Error("AIからの応答がありませんでした");
     }
 
-    const result = JSON.parse(content);
+    const result = JSON.parse(content.text);
 
     return NextResponse.json({ result });
   } catch (error: unknown) {
