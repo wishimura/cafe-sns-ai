@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Shop } from "@/types/database";
+import type { Shop, PostTemplate } from "@/types/database";
 import {
   PenSquare,
   Loader2,
@@ -12,15 +12,30 @@ import {
   ArrowRight,
   ImagePlus,
   X,
+  Bookmark,
+  BookmarkPlus,
+  Globe,
+  Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PostResult from "@/components/PostResult";
+import TemplateList from "@/components/TemplateList";
+import SaveTemplateModal from "@/components/SaveTemplateModal";
+import ScheduleModal from "@/components/ScheduleModal";
+import ImageEditor from "@/components/ImageEditor";
+
+interface TranslationContent {
+  instagram_posts: { text: string }[];
+  story_text: string;
+  hashtags: string;
+}
 
 interface GeneratedPost {
   instagram_posts: { text: string }[];
   story_text: string;
   line_text: string;
   hashtags: string;
+  translations?: Record<string, TranslationContent>;
 }
 
 function PostPageContent() {
@@ -33,6 +48,13 @@ function PostPageContent() {
   const [result, setResult] = useState<GeneratedPost | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateRefresh, setTemplateRefresh] = useState(0);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [instagramConnected, setInstagramConnected] = useState(false);
+  const [instagramPublishing, setInstagramPublishing] = useState(false);
   const [form, setForm] = useState({
     theme: "",
     menuItem: "",
@@ -43,6 +65,7 @@ function PostPageContent() {
     hasWeatherNote: false,
     includeTakeout: false,
     includeVisitGuide: false,
+    languages: [] as string[],
   });
 
   // 再編集用：URLパラメータからフォームにプリフィル
@@ -74,6 +97,17 @@ function PostPageContent() {
         .single();
 
       setShop(data);
+
+      // Check Instagram connection
+      if (data) {
+        const { data: igConnection } = await supabase
+          .from("instagram_connections")
+          .select("id")
+          .eq("shop_id", data.id)
+          .single();
+        setInstagramConnected(!!igConnection);
+      }
+
       setLoading(false);
     }
     loadShop();
@@ -90,6 +124,15 @@ function PostPageContent() {
       ...prev,
       [name]:
         type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
+
+  const handleLanguageToggle = (lang: string) => {
+    setForm((prev) => ({
+      ...prev,
+      languages: prev.languages.includes(lang)
+        ? prev.languages.filter((l) => l !== lang)
+        : [...prev.languages, lang],
     }));
   };
 
@@ -195,6 +238,84 @@ function PostPageContent() {
     }
   };
 
+  const handleTemplateSelect = (template: PostTemplate) => {
+    setForm((prev) => ({
+      ...prev,
+      theme: template.theme,
+      menuItem: template.menu_item,
+      supplement: template.supplement,
+      toneStyle: template.tone_style || prev.toneStyle,
+      platform: template.platform || prev.platform,
+    }));
+    toast.success(`テンプレート「${template.name}」を適用しました`);
+  };
+
+  const handleSaveTemplate = async (name: string) => {
+    if (!shop) return;
+    setSavingTemplate(true);
+    try {
+      const { error } = await supabase.from("post_templates").insert({
+        shop_id: shop.id,
+        name,
+        theme: form.theme,
+        menu_item: form.menuItem,
+        supplement: form.supplement,
+        tone_style: form.toneStyle,
+        platform: form.platform,
+      });
+      if (error) throw error;
+      toast.success("テンプレートを保存しました");
+      setShowSaveTemplate(false);
+      setTemplateRefresh((prev) => prev + 1);
+    } catch {
+      toast.error("テンプレートの保存に失敗しました");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleInstagramPublish = async (postIndex: number) => {
+    if (!result || !shop) return;
+
+    if (!photoFile) {
+      toast.error("Instagramへの投稿には画像が必要です。写真をアップロードしてください。");
+      return;
+    }
+
+    setInstagramPublishing(true);
+    try {
+      // First upload the photo to get a public URL
+      const photoUrl = await uploadPhoto();
+      if (!photoUrl) {
+        throw new Error("画像のアップロードに失敗しました");
+      }
+
+      const postText = result.instagram_posts[postIndex]?.text || "";
+      const response = await fetch("/api/instagram/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postText,
+          photoUrl,
+          hashtags: result.hashtags,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Instagramへの投稿に失敗しました");
+      }
+
+      toast.success("Instagramに投稿しました！");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Instagramへの投稿に失敗しました";
+      toast.error(message);
+    } finally {
+      setInstagramPublishing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -233,6 +354,29 @@ function PostPageContent() {
       <div className="flex items-center gap-3 mb-6">
         <PenSquare className="w-6 h-6 text-pink-600" />
         <h1 className="text-2xl font-bold">投稿作成</h1>
+      </div>
+
+      {/* テンプレートセクション */}
+      <div className="card mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Bookmark className="w-5 h-5 text-brand-600" />
+            <h2 className="font-bold text-lg">テンプレート</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowSaveTemplate(true)}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <BookmarkPlus className="w-4 h-4" />
+            テンプレートとして保存
+          </button>
+        </div>
+        <TemplateList
+          shopId={shop.id}
+          onSelect={handleTemplateSelect}
+          refreshKey={templateRefresh}
+        />
       </div>
 
       <form onSubmit={handleGenerate} className="space-y-6">
@@ -289,13 +433,24 @@ function PostPageContent() {
                   alt="プレビュー"
                   className="w-32 h-32 object-cover rounded-lg border"
                 />
-                <button
-                  type="button"
-                  onClick={removePhoto}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                <div className="absolute -top-2 -right-2 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowImageEditor(true)}
+                    className="bg-brand-600 text-white rounded-full p-1 hover:bg-brand-700 transition-colors"
+                    title="画像を編集"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    className="bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    title="写真を削除"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             ) : (
               <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 transition-colors w-full">
@@ -341,6 +496,37 @@ function PostPageContent() {
                 >
                   {opt.label}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 多言語対応 */}
+          <div>
+            <label className="label flex items-center gap-1.5">
+              <Globe className="w-4 h-4" />
+              多言語対応
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              選択した言語の翻訳も同時に生成します
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { value: "en", label: "English" },
+                { value: "zh", label: "中文簡体" },
+                { value: "ko", label: "한국어" },
+              ].map((lang) => (
+                <label
+                  key={lang.value}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-brand-600 rounded"
+                    checked={form.languages.includes(lang.value)}
+                    onChange={() => handleLanguageToggle(lang.value)}
+                  />
+                  <span className="text-sm text-gray-700">{lang.label}</span>
+                </label>
               ))}
             </div>
           </div>
@@ -449,7 +635,46 @@ function PostPageContent() {
           onRegenerate={() =>
             handleGenerate({ preventDefault: () => {} } as React.FormEvent)
           }
+          onSchedule={() => setShowScheduleModal(true)}
           generating={generating}
+          translations={result.translations}
+          instagramConnected={instagramConnected && !!photoFile}
+          onInstagramPublish={handleInstagramPublish}
+          instagramPublishing={instagramPublishing}
+        />
+      )}
+
+      <SaveTemplateModal
+        isOpen={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        onSave={handleSaveTemplate}
+        saving={savingTemplate}
+      />
+
+      {result && shop && (
+        <ScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          postContent={result}
+          platform={form.platform}
+          photoUrl={photoPreview}
+          shopId={shop.id}
+        />
+      )}
+
+      {showImageEditor && photoFile && (
+        <ImageEditor
+          imageFile={photoFile}
+          onSave={(editedBlob) => {
+            const editedFile = new File([editedBlob], "edited-photo.jpg", {
+              type: "image/jpeg",
+            });
+            setPhotoFile(editedFile);
+            setPhotoPreview(URL.createObjectURL(editedBlob));
+            setShowImageEditor(false);
+            toast.success("画像を編集しました");
+          }}
+          onCancel={() => setShowImageEditor(false)}
         />
       )}
     </div>

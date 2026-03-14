@@ -30,7 +30,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         });
         if (error) throw error;
         toast.success("アカウントを作成しました");
-        router.push("/dashboard");
+        router.push("/onboarding");
         router.refresh();
       } else {
         const { error } = await supabase.auth.signInWithPassword({

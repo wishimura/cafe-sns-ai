@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { shopId, theme, menuItem, supplement, toneStyle, weatherNote, hasWeatherNote, includeTakeout, includeVisitGuide } = body;
+    const { shopId, theme, menuItem, supplement, toneStyle, weatherNote, hasWeatherNote, includeTakeout, includeVisitGuide, languages } = body;
 
     if (!shopId || !theme || !menuItem) {
       return NextResponse.json(
@@ -55,6 +55,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const validLanguages: string[] = Array.isArray(languages)
+      ? languages.filter((l: string) => ["en", "zh", "ko"].includes(l))
+      : [];
+
     const prompt = buildPostGenerationPrompt({
       shop,
       theme,
@@ -65,11 +69,14 @@ export async function POST(request: Request) {
       weatherNote: weatherNote || "",
       includeTakeout: includeTakeout || false,
       includeVisitGuide: includeVisitGuide || false,
+      languages: validLanguages.length > 0 ? validLanguages : undefined,
     });
+
+    const maxTokens = validLanguages.length > 0 ? 4096 : 2048;
 
     const message = await getAnthropic().messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+      max_tokens: maxTokens,
       messages: [
         {
           role: "user",

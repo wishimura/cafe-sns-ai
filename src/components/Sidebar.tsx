@@ -10,12 +10,15 @@ import {
   PenSquare,
   MessageSquare,
   Clock,
+  CalendarDays,
   Store,
   LogOut,
   Menu,
   X,
   Shield,
   CreditCard,
+  Instagram,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -25,6 +28,9 @@ const navItems = [
   { href: "/dashboard/post", label: "投稿作成", icon: PenSquare },
   { href: "/dashboard/review", label: "レビュー返信", icon: MessageSquare },
   { href: "/dashboard/history", label: "履歴", icon: Clock },
+  { href: "/dashboard/calendar", label: "カレンダー", icon: CalendarDays },
+  { href: "/dashboard/settings/instagram", label: "Instagram連携", icon: Instagram },
+  { href: "/dashboard/team", label: "チーム", icon: Users },
   { href: "/dashboard/shop", label: "店舗設定", icon: Store },
   { href: "/dashboard/plan", label: "プラン", icon: CreditCard },
 ];

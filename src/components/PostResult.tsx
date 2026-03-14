@@ -10,8 +10,19 @@ import {
   Hash,
   Check,
   Loader2,
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  CalendarPlus,
+  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
+
+interface TranslationContent {
+  instagram_posts?: { text: string }[];
+  story_text?: string;
+  hashtags?: string;
+}
 
 interface PostResultProps {
   result: {
@@ -23,17 +34,35 @@ interface PostResultProps {
   platform: string;
   onSave: () => void;
   onRegenerate: () => void;
+  onSchedule?: () => void;
   generating: boolean;
+  translations?: Record<string, TranslationContent>;
+  instagramConnected?: boolean;
+  onInstagramPublish?: (postIndex: number) => void;
+  instagramPublishing?: boolean;
 }
+
+const LANGUAGE_INFO: Record<string, { flag: string; label: string }> = {
+  en: { flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
+  zh: { flag: "\u{1F1E8}\u{1F1F3}", label: "\u4E2D\u6587" },
+  ko: { flag: "\u{1F1F0}\u{1F1F7}", label: "\uD55C\uAD6D\uC5B4" },
+};
 
 export default function PostResult({
   result,
   platform,
   onSave,
   onRegenerate,
+  onSchedule,
   generating,
+  translations,
+  instagramConnected,
+  onInstagramPublish,
+  instagramPublishing,
 }: PostResultProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [openTranslations, setOpenTranslations] = useState<Record<string, boolean>>({});
+  const [activeTranslationLang, setActiveTranslationLang] = useState<Record<string, string>>({});
 
   const copyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -56,9 +85,88 @@ export default function PostResult({
     </button>
   );
 
+  const toggleTranslation = (section: string) => {
+    setOpenTranslations((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const getActiveLang = (section: string): string => {
+    if (activeTranslationLang[section]) return activeTranslationLang[section];
+    if (translations) {
+      const langs = Object.keys(translations);
+      if (langs.length > 0) return langs[0];
+    }
+    return "en";
+  };
+
+  const setActiveLang = (section: string, lang: string) => {
+    setActiveTranslationLang((prev) => ({ ...prev, [section]: lang }));
+  };
+
+  const hasTranslations = translations && Object.keys(translations).length > 0;
+  const translationLangs = hasTranslations ? Object.keys(translations) : [];
+
   const showInstagram = platform === "all" || platform === "instagram";
   const showStory = platform === "all" || platform === "story";
   const showLine = platform === "all" || platform === "line";
+
+  const TranslationSection = ({
+    section,
+    children,
+  }: {
+    section: string;
+    children: (lang: string, translation: TranslationContent) => React.ReactNode;
+  }) => {
+    if (!hasTranslations) return null;
+
+    const isOpen = openTranslations[section] || false;
+    const activeLang = getActiveLang(section);
+
+    return (
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => toggleTranslation(section)}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          {isOpen ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          <Globe className="w-3.5 h-3.5" />
+          <span>翻訳</span>
+        </button>
+
+        {isOpen && (
+          <div className="mt-2 bg-blue-50 rounded-lg p-4">
+            {/* Language tabs */}
+            <div className="flex gap-1 mb-3">
+              {translationLangs.map((lang) => {
+                const info = LANGUAGE_INFO[lang] || { flag: "", label: lang };
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => setActiveLang(section, lang)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      activeLang === lang
+                        ? "bg-white text-brand-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {info.flag} {info.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Translation content */}
+            {translations![activeLang] && children(activeLang, translations![activeLang])}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="mt-8 space-y-6">
@@ -77,6 +185,15 @@ export default function PostResult({
             )}
             再生成
           </button>
+          {onSchedule && (
+            <button
+              onClick={onSchedule}
+              className="btn-secondary flex items-center gap-2 text-sm flex-1 sm:flex-none justify-center"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              予約
+            </button>
+          )}
           <button
             onClick={onSave}
             className="btn-primary flex items-center gap-2 text-sm flex-1 sm:flex-none justify-center"
@@ -105,10 +222,50 @@ export default function PostResult({
                     {post.text}
                   </p>
                 </div>
-                <CopyButton text={post.text} id={`ig-${i}`} />
+                <div className="flex items-center gap-1 shrink-0">
+                  <CopyButton text={post.text} id={`ig-${i}`} />
+                  {instagramConnected && onInstagramPublish && (
+                    <button
+                      onClick={() => onInstagramPublish(i)}
+                      disabled={instagramPublishing}
+                      className="text-pink-500 hover:text-pink-700 transition-colors p-1"
+                      title="Instagramに投稿"
+                    >
+                      {instagramPublishing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
+
+          <TranslationSection section="instagram">
+            {(lang, translation) =>
+              translation.instagram_posts && translation.instagram_posts.length > 0 ? (
+                <div className="space-y-3">
+                  {translation.instagram_posts.map((post, i) => (
+                    <div key={i} className="bg-white rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-medium text-gray-400 mb-1 block">
+                            案{i + 1}
+                          </span>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {post.text}
+                          </p>
+                        </div>
+                        <CopyButton text={post.text} id={`ig-${lang}-${i}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            }
+          </TranslationSection>
         </div>
       )}
 
@@ -125,6 +282,19 @@ export default function PostResult({
               <CopyButton text={result.story_text} id="story" />
             </div>
           </div>
+
+          <TranslationSection section="story">
+            {(lang, translation) =>
+              translation.story_text ? (
+                <div className="bg-white rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm">{translation.story_text}</p>
+                    <CopyButton text={translation.story_text} id={`story-${lang}`} />
+                  </div>
+                </div>
+              ) : null
+            }
+          </TranslationSection>
         </div>
       )}
 
@@ -161,6 +331,21 @@ export default function PostResult({
               <CopyButton text={result.hashtags} id="hashtags" />
             </div>
           </div>
+
+          <TranslationSection section="hashtags">
+            {(lang, translation) =>
+              translation.hashtags ? (
+                <div className="bg-white rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-blue-600 leading-relaxed">
+                      {translation.hashtags}
+                    </p>
+                    <CopyButton text={translation.hashtags} id={`hashtags-${lang}`} />
+                  </div>
+                </div>
+              ) : null
+            }
+          </TranslationSection>
         </div>
       )}
     </div>

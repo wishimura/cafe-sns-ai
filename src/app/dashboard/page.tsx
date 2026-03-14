@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Shop } from "@/types/database";
 import {
@@ -14,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import TopicSuggestions from "@/components/TopicSuggestions";
 
 const PLAN_LIMITS: Record<string, number> = {
   free: 5,
@@ -32,6 +34,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [usage, setUsage] = useState({ plan: "free", count: 0 });
   const supabase = createClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !shop) {
+      router.push("/onboarding");
+    }
+  }, [loading, shop, router]);
 
   useEffect(() => {
     async function loadShop() {
@@ -128,6 +137,9 @@ export default function DashboardPage() {
           )}
         </Link>
       )}
+
+      {/* おすすめ投稿ネタ */}
+      {shop && <TopicSuggestions shopId={shop.id} />}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Link
