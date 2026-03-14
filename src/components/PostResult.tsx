@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Globe,
   CalendarPlus,
-  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -37,9 +36,6 @@ interface PostResultProps {
   onSchedule?: () => void;
   generating: boolean;
   translations?: Record<string, TranslationContent>;
-  instagramConnected?: boolean;
-  onInstagramPublish?: (postIndex: number) => void;
-  instagramPublishing?: boolean;
 }
 
 const LANGUAGE_INFO: Record<string, { flag: string; label: string }> = {
@@ -56,9 +52,6 @@ export default function PostResult({
   onSchedule,
   generating,
   translations,
-  instagramConnected,
-  onInstagramPublish,
-  instagramPublishing,
 }: PostResultProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [openTranslations, setOpenTranslations] = useState<Record<string, boolean>>({});
@@ -222,23 +215,7 @@ export default function PostResult({
                     {post.text}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <CopyButton text={post.text} id={`ig-${i}`} />
-                  {instagramConnected && onInstagramPublish && (
-                    <button
-                      onClick={() => onInstagramPublish(i)}
-                      disabled={instagramPublishing}
-                      className="text-pink-500 hover:text-pink-700 transition-colors p-1"
-                      title="Instagramに投稿"
-                    >
-                      {instagramPublishing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                </div>
+                <CopyButton text={post.text} id={`ig-${i}`} />
               </div>
             </div>
           ))}

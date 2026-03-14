@@ -74,16 +74,6 @@ export interface ScheduledPost {
   created_at: string;
 }
 
-export interface InstagramConnection {
-  id: string;
-  shop_id: string;
-  access_token: string;
-  ig_user_id: string;
-  ig_username: string;
-  token_expires_at: string | null;
-  created_at: string;
-}
-
 export interface TeamMember {
   id: string;
   shop_id: string;

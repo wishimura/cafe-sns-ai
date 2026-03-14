@@ -17,7 +17,6 @@ import {
   X,
   Shield,
   CreditCard,
-  Instagram,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +28,6 @@ const navItems = [
   { href: "/dashboard/review", label: "レビュー返信", icon: MessageSquare },
   { href: "/dashboard/history", label: "履歴", icon: Clock },
   { href: "/dashboard/calendar", label: "カレンダー", icon: CalendarDays },
-  { href: "/dashboard/settings/instagram", label: "Instagram連携", icon: Instagram },
   { href: "/dashboard/team", label: "チーム", icon: Users },
   { href: "/dashboard/shop", label: "店舗設定", icon: Store },
   { href: "/dashboard/plan", label: "プラン", icon: CreditCard },

@@ -53,8 +53,6 @@ function PostPageContent() {
   const [templateRefresh, setTemplateRefresh] = useState(0);
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [instagramConnected, setInstagramConnected] = useState(false);
-  const [instagramPublishing, setInstagramPublishing] = useState(false);
   const [form, setForm] = useState({
     theme: "",
     menuItem: "",
@@ -97,17 +95,6 @@ function PostPageContent() {
         .single();
 
       setShop(data);
-
-      // Check Instagram connection
-      if (data) {
-        const { data: igConnection } = await supabase
-          .from("instagram_connections")
-          .select("id")
-          .eq("shop_id", data.id)
-          .single();
-        setInstagramConnected(!!igConnection);
-      }
-
       setLoading(false);
     }
     loadShop();
@@ -271,48 +258,6 @@ function PostPageContent() {
       toast.error("テンプレートの保存に失敗しました");
     } finally {
       setSavingTemplate(false);
-    }
-  };
-
-  const handleInstagramPublish = async (postIndex: number) => {
-    if (!result || !shop) return;
-
-    if (!photoFile) {
-      toast.error("Instagramへの投稿には画像が必要です。写真をアップロードしてください。");
-      return;
-    }
-
-    setInstagramPublishing(true);
-    try {
-      // First upload the photo to get a public URL
-      const photoUrl = await uploadPhoto();
-      if (!photoUrl) {
-        throw new Error("画像のアップロードに失敗しました");
-      }
-
-      const postText = result.instagram_posts[postIndex]?.text || "";
-      const response = await fetch("/api/instagram/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postText,
-          photoUrl,
-          hashtags: result.hashtags,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Instagramへの投稿に失敗しました");
-      }
-
-      toast.success("Instagramに投稿しました！");
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Instagramへの投稿に失敗しました";
-      toast.error(message);
-    } finally {
-      setInstagramPublishing(false);
     }
   };
 
@@ -638,9 +583,6 @@ function PostPageContent() {
           onSchedule={() => setShowScheduleModal(true)}
           generating={generating}
           translations={result.translations}
-          instagramConnected={instagramConnected && !!photoFile}
-          onInstagramPublish={handleInstagramPublish}
-          instagramPublishing={instagramPublishing}
         />
       )}
 
